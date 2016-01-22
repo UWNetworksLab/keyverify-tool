@@ -1,0 +1,25 @@
+{
+  "name": "keyverify-tool",
+  "version": "0.1.0",
+  "description": "uProxy Key Verification Development Tool.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "Molly Ling <mollyling@uproxy.org>",
+  "license": "Apache Version 2.0",
+  "dependencies": {
+      "e2e": "^0.0.6",
+      "es6-promise": "~3.0",
+      "freedom": "~0.6.26",
+      "freedom-for-node": "~0.2",
+      "freedom-pgp-e2e": "^0.5.0",
+      "grunt": "^0.4.0",
+      "lodash": "^3.0.0",
+      "randgen": "~0.1",
+      "request": "~2.65",
+      "sprintf": "~0.1",
+
+      "yargs": "~3.31"
+  }
+}
