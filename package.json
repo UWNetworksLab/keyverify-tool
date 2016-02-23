@@ -19,7 +19,7 @@
       "randgen": "~0.1",
       "request": "~2.65",
       "sprintf": "~0.1",
-
+      "json-store": "0.0.1",
       "yargs": "~3.31"
   }
 }
