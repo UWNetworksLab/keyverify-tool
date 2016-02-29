@@ -25,6 +25,7 @@ var argv = require('yargs')
     .demand(1)
     .argv;
 
+//debugger;
 // Message File Format:
 /*
 
@@ -364,7 +365,7 @@ function GenMessages() {
                                                   parseInt(loaded_messages['init-role']) ^ 1);
             }
             // first, calculate s0 by doing the DH exchange math.
-            initiator_user.ecdhBob('ed25519', resp_key.key).then(function (result) {
+            initiator_user.ecdhBob('P_256', resp_key.key).then(function (result) {
               var beZero = new Buffer(4),
                   be64Zero = new Buffer(8),
                   beOne = new Buffer(4);
@@ -372,8 +373,8 @@ function GenMessages() {
               // RFC6189-4.4.1.4
               var total_hash = totalHash();
               var s0_input = Buffer.concat([
-                beOne, result, new Buffer("ZRTP-HMAC-KDF"), be64Zero, be64Zero, total_hash,
-                beZero, beZero, beZero]);
+                beOne, new Buffer(result), new Buffer("ZRTP-HMAC-KDF"), be64Zero,
+                be64Zero, total_hash, beZero, beZero, beZero]);
               var s0 = crypto.createHash('sha256').update(s0_input).digest();
               var kdf_context = Buffer.concat([ be64Zero, be64Zero, total_hash ]);
               // RFC6189-4.5.2
@@ -396,14 +397,14 @@ function GenMessages() {
 //  process.exit(0);
 }
 
-var pgpapi = JSON.parse(fs.readFileSync('node_modules/freedom-pgp-e2e/dist/pgpapi.json', 'utf8')).api.crypto;
-var e2e = require('freedom-pgp-e2e/dist/e2e_super').mye2e;
-var proto = testutil.directProviderFor(e2e, pgpapi);
+//var pgpapi = JSON.parse(fs.readFileSync('node_modules/freedom-pgp-e2e/dist/pgpapi.json', 'utf8')).api.crypto;
+//var e2e = require('freedom-pgp-e2e/dist/e2e_super').mye2e;
+//var proto = testutil.directProviderFor(e2e, pgpapi);
 
-//freedom.freedom('node_modules/freedom-pgp-e2e/dist/pgpapi.json', {
+freedom.freedom('node_modules/freedom-pgp-e2e/dist/pgpapi.json', {
 //  portType: 'Direct', moduleContext: true
-//}).then(
-//    function(proto) {
+}).then(
+    function(proto) {
       alice = new proto();
       bob = new proto();
       // Define a JSON blob for the conversation.  We can only
@@ -425,5 +426,5 @@ var proto = testutil.directProviderFor(e2e, pgpapi);
       }
       // Kickstart the process by loading alice's key.
       LoadAlicesKey();
-//    }
-//);
+    }
+);
