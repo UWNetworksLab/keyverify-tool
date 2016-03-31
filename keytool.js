@@ -254,11 +254,11 @@ function finishWithGeneratedMessage(key, value) {
   process.exit(0);
 }
 
-function makeHello(own_public_key) {
+function makeHello(own_public_key, role) {
   var message = {type: 'Hello', clientVersion: '0.1'};
-  message.h3 = loaded_messages.hashes[argv.roleNum][0];
+  message.h3 = loaded_messages.hashes[role][0];
   message.hk = own_public_key.fingerprint.replace(/ /g, '');
-  message.mac = mac(loaded_messages.hashes[argv.roleNum][1],
+  message.mac = mac(loaded_messages.hashes[role][1],
                     message.h3 + message.hk + message.clientVersion);
   return message;
 }
@@ -271,9 +271,9 @@ function makeDHPart(partNr, own_public_key, role) {
   return message;
 }
 
-function totalHash() {
+function totalHash(role) {
   var hello_r;
-  if (loaded_messages['init-role'] == 0) {
+  if (loaded_messages['init-role'] == role) {
     hello_r = loaded_messages['hello-1'];
   } else {
     hello_r = loaded_messages['hello-0'];
@@ -283,7 +283,8 @@ function totalHash() {
   var dhpart2 = loaded_messages.dhpart2;
   var total_hash_buf = Buffer.concat([
     new Buffer(hello_r.h3), new Buffer(hello_r.hk), new Buffer(hello_r.mac),
-    new Buffer(commit.h2), new Buffer(commit.hk), new Buffer(commit.clientVersion), new Buffer(commit.hvi),
+    new Buffer(commit.h2), new Buffer(commit.hk), new Buffer(commit.clientVersion),
+    new Buffer(commit.hvi),
     new Buffer(dhpart1.h1), new Buffer(dhpart1.pkey), new Buffer(dhpart1.mac),
     new Buffer(dhpart2.h1), new Buffer(dhpart2.pkey), new Buffer(dhpart2.mac)
   ]);
@@ -364,7 +365,11 @@ function GenMessages() {
               loaded_messages.dhpart1 = makeDHPart(1, resp_key,
                                                   parseInt(loaded_messages['init-role']) ^ 1);
             }
-            // first, calculate s0 by doing the DH exchange math.
+            // first, calculate s0 by doing the DH exchange math.  Note that
+            // this is a little confusing in that initiator_user may be either
+            // alice or bob.  So let's ignore the fact that the api is called
+            // ecdhBob, as that's not related specifically to our alice or bob.
+            // It's the bob role, not our actual bob.
             initiator_user.ecdhBob('P_256', resp_key.key).then(function (result) {
               var beZero = new Buffer(4),
                   be64Zero = new Buffer(8),
@@ -380,7 +385,7 @@ function GenMessages() {
               // RFC6189-4.5.2
               var sashash = kdf(s0, "SAS", kdf_context, 256);
               var sasvalue = sashash.slice(0, 4);
-              var sasHumanInt = sasvalue.slice(0,2).readInt16BE(0);
+              var sasHumanInt = sasvalue.slice(0,2).readUInt16BE(0);
               console.log("SAS is " + sasHumanInt);
               var h0 = loaded_messages.hashes[argv.roleNum][3]
               var message = {
