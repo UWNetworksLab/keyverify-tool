@@ -214,10 +214,10 @@ function mac(key, value){
 
 // Load key(s)
 function SearchAlicesKey(param) {
-  console.log('SearchAlicesKey: running with param ', param);
+//  console.log('SearchAlicesKey: running with param ', param);
   alice.searchPrivateKey('<user-0@example.com>').addCallback(
       function(v) {
-        console.log('searchPrivateKey: Success', v);
+        //console.log('searchPrivateKey: Success', v);
       })
   .addErrback(function(err) {
     console.log('searchaliceskey: failed:', err);
@@ -241,6 +241,7 @@ function LoadBobsKey() {
 }
 
 function finishWithGeneratedMessage(key, value) {
+//  console.log("finishWithGeneratedMessage: ", key," and value ", value);
   loaded_messages[key] = value;
   if (argv.verbose > 0) {
     console.log('Generated: ' + key + ': ' + JSON.stringify(value, null, 2));
@@ -304,6 +305,7 @@ function kdf(key, label, context, numbits) {
 
 // Generate Message(s)
 function GenMessages() {
+//  console.log("Starting GenMessages.");
   // Look at what message the arg asked for:
   if (argv.generate) {
     var desired_message = argv.generate.toLowerCase();
@@ -314,8 +316,10 @@ function GenMessages() {
     role_user.exportKey().then(function (own_public_key) {
       keys[argv.roleNum] = own_public_key;
       if (desired_message == 'hello') {
-        console.log('- Got own_public_key: ' + JSON.stringify(own_public_key, null, 2));
-        var message = makeHello(own_public_key);
+        if (argv.verbose > 0) {
+          console.log('- Got own_public_key: ' + JSON.stringify(own_public_key, null, 2));
+        }
+        var message = makeHello(own_public_key, argv.roleNum);
         finishWithGeneratedMessage('hello-' + argv.roleNum, message);
       } else // commit requires dhpart1/2, so make them.
         if (desired_message == 'commit') {
@@ -396,10 +400,15 @@ function GenMessages() {
               finishWithGeneratedMessage(message.type, message);
             });
           });
+        } else {
+          console.log("Unknown message type: ", desired_message);
+          process.exit(0);
         }
     }, LogFailureAndExit);
+  } else {
+    console.log("Not generating messages.  Exiting.");
+    process.exit(0);
   }
-//  process.exit(0);
 }
 
 //var pgpapi = JSON.parse(fs.readFileSync('node_modules/freedom-pgp-e2e/dist/pgpapi.json', 'utf8')).api.crypto;
