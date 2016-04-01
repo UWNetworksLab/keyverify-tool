@@ -155,10 +155,40 @@ function xorBuffer(buf, value) {
   return buf;
 }
 
+function strBuffer(buf) {
+  var b = new DataView(buf);
+  var result = "";
+  for (var i = 0; i < b.byteLength; i++) {
+    if (i != 0) {
+      result += ",";
+    }
+    result += b.getUint8(i);
+  }
+  return result;
+}
+
+function strNBuffer(b) {
+  if (Buffer.isBuffer(b)) {
+    var result = "";
+    for (var i = 0; i < b.length; i++) {
+      if (i != 0) {
+        result += ",";
+      }
+      result += b.readUInt8(i);
+    }
+    return result;
+  } else {
+    return "not a node buffer.";
+  }
+}
+
+
 // Assumes key and value are base64-encoded strings.
 function fullHmac(key, value) {
   var kBlockSize = 64;  // sha-256 block size is 512 bits - 64 bytes.
   var key_buf = new Buffer(key, 'base64');
+  console.log("fullHmac: key: ", key);
+  console.log("fullHmac: value: ", value);
   // Follow FIPS-198 quite literally.  I haven't found any docs on
   // createHmac(sha256,key) w.r.t. FIPS-198.
   if (key_buf.length > kBlockSize) {
@@ -174,31 +204,33 @@ function fullHmac(key, value) {
   }
 
   var k_0 = new Buffer(key_buf);
+  console.log('fullHmac k_0:', strNBuffer(k_0));
 
   // ipad = 0x36.
   var kb_step4 = xorBuffer(new Buffer(k_0), 0x36);
-//  console.log('A:',kb_step4);
+  console.log('fullHmac A:',strNBuffer(kb_step4));
 
   // Step 5
   var ki_text = Buffer.concat([kb_step4, new Buffer(value, 'base64')]);
-//  console.log('B:',ki_text);
+  console.log('fullHmac B:',strNBuffer(ki_text));
 
   // Step 6
   var h_ki_text = crypto.createHash('sha256').update(ki_text).digest();
-//  console.log('C:',h_ki_text);
+  console.log('fullHmac C:',h_ki_text);
 
   // Step 7 - xor with 0x5c.
   var ko_text = xorBuffer(new Buffer(k_0), 0x5c);
-//  console.log('D:',ko_text);
+  console.log('fullHmac D:',strNBuffer(ko_text));
 
   // Step 8 - concat steps 7 and 6
   var ki_h_ko_text = Buffer.concat([ko_text, h_ki_text]);
-//  console.log('E:',ki_h_ko_text);
+  console.log('fullHmac E:',strNBuffer(ki_h_ko_text));
 
   // Final step: hash step 8.
-  return crypto.createHash('sha256').update(ki_h_ko_text).digest();
-//  console.log('F:',full_hmac);
+  var full_hmac = crypto.createHash('sha256').update(ki_h_ko_text).digest();
+  console.log('fullHmac F:',full_hmac);
 
+  return full_hmac;
 }
 
 // http://csrc.nist.gov/publications/fips/fips198-1/FIPS-198-1_final.pdf
@@ -290,21 +322,36 @@ function totalHash(role) {
     new Buffer(dhpart2.h1), new Buffer(dhpart2.pkey), new Buffer(dhpart2.mac)
   ]);
 
-  console.log("totalHash: init-role: ", loaded_messages['init-role']);
-  console.log("totalHash: commit: ", commit);
-  console.log("totalHash: dhpart1: ", dhpart1);
-  console.log("totalHash: dhpart2: ", dhpart2);
+  if (argv.verbose > 0) {
+    console.log("totalHash: init-role: ", loaded_messages['init-role']);
+    console.log("totalHash: hello_r: h3:", hello_r.h3, ", hk:", hello_r.hk, ", mac:", hello_r.mac);
+    console.log("totalHash: commit: h2: ", commit.h2, ", hk:", commit.hk, ", clientVersion:",
+                commit.clientVersion, ", hvi:", commit.hvi);
+    console.log("totalHash: dhpart1: h1:", dhpart1.h1, ", pkey:", dhpart1.pkey, ", mac:", dhpart1.mac);
+    console.log("totalHash: dhpart2: h1:", dhpart2.h1, ", pkey:", dhpart2.pkey, ", mac:", dhpart2.mac);
+  }
 
-  return crypto.createHash('sha256').update(total_hash_buf).digest();
+  var hashed = crypto.createHash('sha256').update(total_hash_buf).digest();
+  return hashed;
 }
-
+// 'key' is a regular buffer, that we re-encode into a base64 string for fullHmac.
 function kdf(key, label, context, numbits) {
   var oneBuf = new Buffer(4);
-  oneBuf.writeInt32BE(1, 0);
   var lenBuf = new Buffer(4);
+  oneBuf.writeInt32BE(1, 0);
   lenBuf.writeInt32BE(numbits, 0);
-  var full_hmac = fullHmac(key, Buffer.concat([
-    oneBuf, new Buffer(label), new Buffer(1), new Buffer(context), lenBuf]));
+  console.log("kdf: key", key);
+  console.log("kdf: oneBuf", oneBuf);
+  console.log("kdf: label", new Buffer(label));
+  console.log("kdf: context", new Buffer(context));
+  console.log("kdf: lenBuf", lenBuf);
+  var b64Key = key.toString('base64');
+  var zeroByte = new Buffer(1);
+  zeroByte.writeUInt8(0,0);
+  var completeValue = Buffer.concat([
+    oneBuf, new Buffer(label), zeroByte, new Buffer(context), lenBuf]);
+  var full_hmac = fullHmac(b64Key, completeValue.toString('base64'));
+  console.log("kdf: full_hmac: ", full_hmac);
   return full_hmac.slice(0, Math.ceil(numbits / 8));
 }
 
@@ -380,22 +427,33 @@ function GenMessages() {
             // ecdhBob, as that's not related specifically to our alice or bob.
             // It's the bob role, not our actual bob.
             initiator_user.ecdhBob('P_256', resp_key.key).then(function (result) {
-              var beZero = new Buffer(4),
-                  be64Zero = new Buffer(8),
+              var be64Zero = new Buffer(8),
+                  beZero = new Buffer(4),
                   beOne = new Buffer(4);
               beOne.writeInt32BE(1,0);
+              beZero.writeInt32BE(0,0);
+              be64Zero.writeInt32BE(0,0);
+              be64Zero.writeInt32BE(0,4);
               // RFC6189-4.4.1.4
               var total_hash = totalHash();
               var s0_input = Buffer.concat([
                 beOne, new Buffer(result), new Buffer("ZRTP-HMAC-KDF"), be64Zero,
                 be64Zero, total_hash, beZero, beZero, beZero]);
-              console.log("s0_inputs: result:", result);
+              console.log("s0_inputs: result:", strBuffer(result));
               console.log("s0_inputs: total_hash:", total_hash);
+              console.log("so_inputs: beOne:", beOne);
+              console.log("so_inputs: be64Zero:", be64Zero);
+              console.log("so_inputs: beZero:", beZero);
+
               var s0 = crypto.createHash('sha256').update(s0_input).digest();
+              console.log("s0: ", s0);
               var kdf_context = Buffer.concat([ be64Zero, be64Zero, total_hash ]);
+              console.log("kdf_context: ", kdf_context);
               // RFC6189-4.5.2
               var sashash = kdf(s0, "SAS", kdf_context, 256);
+              console.log("sashash: ", sashash);
               var sasvalue = sashash.slice(0, 4);
+              console.log("sasvalue: ", sasvalue);
               var sasHumanInt = sasvalue.slice(0,2).readUInt16BE(0);
               console.log("SAS is " + sasHumanInt);
               var h0 = loaded_messages.hashes[argv.roleNum][3]
