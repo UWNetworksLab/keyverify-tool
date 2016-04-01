@@ -273,7 +273,7 @@ function makeDHPart(partNr, own_public_key, role) {
 
 function totalHash(role) {
   var hello_r;
-  if (loaded_messages['init-role'] == role) {
+  if (loaded_messages['init-role'] == 0) {
     hello_r = loaded_messages['hello-1'];
   } else {
     hello_r = loaded_messages['hello-0'];
@@ -288,6 +288,11 @@ function totalHash(role) {
     new Buffer(dhpart1.h1), new Buffer(dhpart1.pkey), new Buffer(dhpart1.mac),
     new Buffer(dhpart2.h1), new Buffer(dhpart2.pkey), new Buffer(dhpart2.mac)
   ]);
+
+  console.log("totalHash: init-role: ", loaded_messages['init-role']);
+  console.log("totalHash: commit: ", commit);
+  console.log("totalHash: dhpart1: ", dhpart1);
+  console.log("totalHash: dhpart2: ", dhpart2);
 
   return crypto.createHash('sha256').update(total_hash_buf).digest();
 }
@@ -380,6 +385,8 @@ function GenMessages() {
               var s0_input = Buffer.concat([
                 beOne, new Buffer(result), new Buffer("ZRTP-HMAC-KDF"), be64Zero,
                 be64Zero, total_hash, beZero, beZero, beZero]);
+              console.log("s0_inputs: result:", result);
+              console.log("s0_inputs: total_hash:", total_hash);
               var s0 = crypto.createHash('sha256').update(s0_input).digest();
               var kdf_context = Buffer.concat([ be64Zero, be64Zero, total_hash ]);
               // RFC6189-4.5.2
