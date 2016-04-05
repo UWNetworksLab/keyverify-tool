@@ -1,9 +1,10 @@
+var ByteBuffer = require("bytebuffer");
 var process = require('process');
 var freedom = require('freedom-for-node');
 var rawFreedom = require('freedom');
 var randgen = require('randgen');
 var request = require('request');
-var crypto = require('crypto');
+var createHash = require('sha.js');
 var fs = require('fs');
 var unused = require('json-store');
 var testutil = require('freedom/spec/util');
@@ -129,10 +130,10 @@ function LogFailureAndExit(err) {
 
 // Hash/Nonce generation
 function generateNonceAndHashes() {
-  var h0Hash = crypto.createHash('sha256'),
-      h1Hash = crypto.createHash('sha256'),
-      h2Hash = crypto.createHash('sha256'),
-      h3Hash = crypto.createHash('sha256');
+  var h0Hash = createHash('sha256'),
+      h1Hash = createHash('sha256'),
+      h2Hash = createHash('sha256'),
+      h3Hash = createHash('sha256');
   h0Hash.update(new Date().toISOString() + '--' + seqno);
   seqno++;
   var h0 = h0Hash.digest();
@@ -155,18 +156,6 @@ function xorBuffer(buf, value) {
   return buf;
 }
 
-function strBuffer(buf) {
-  var b = new DataView(buf);
-  var result = "";
-  for (var i = 0; i < b.byteLength; i++) {
-    if (i != 0) {
-      result += ",";
-    }
-    result += b.getUint8(i);
-  }
-  return result;
-}
-
 function strNBuffer(b) {
   if (Buffer.isBuffer(b)) {
     var result = "";
@@ -177,8 +166,17 @@ function strNBuffer(b) {
       result += b.readUInt8(i);
     }
     return result;
+  } else if (ByteBuffer.isByteBuffer(b)) {
+    var result = "";
+    for (var i = 0; i < b.length; i++) {
+      if (i != 0) {
+        result += ",";
+      }
+      result += b.readUint8(i);
+    }
+    return result;
   } else {
-    return "not a node buffer.";
+    return "not a supported buffer type.";
   }
 }
 
@@ -194,7 +192,7 @@ function fullHmac(key, value) {
   // Follow FIPS-198 quite literally.  I haven't found any docs on
   // createHmac(sha256,key) w.r.t. FIPS-198.
   if (key_buf.length > kBlockSize) {
-    var hmac = crypto.createHash('sha256');
+    var hmac = createHash('sha256');
     hmac.update(key_buf);
     var hash_key = hmac.digest();
     key_buf = Buffer.concat([hmac.digest(),
@@ -221,7 +219,7 @@ function fullHmac(key, value) {
   }
 
   // Step 6
-  var h_ki_text = crypto.createHash('sha256').update(ki_text).digest();
+  var h_ki_text = createHash('sha256').update(ki_text).digest();
   if (argv.verbose > 0) {
     console.log('fullHmac C:',h_ki_text);
   }
@@ -239,7 +237,7 @@ function fullHmac(key, value) {
   }
 
   // Final step: hash step 8.
-  var full_hmac = crypto.createHash('sha256').update(ki_h_ko_text).digest();
+  var full_hmac = createHash('sha256').update(ki_h_ko_text).digest();
   if (argv.verbose > 0) {
     console.log('fullHmac F:',full_hmac);
   }
@@ -345,7 +343,7 @@ function totalHash(role) {
     console.log("totalHash: dhpart2: h1:", dhpart2.h1, ", pkey:", dhpart2.pkey, ", mac:", dhpart2.mac);
   }
 
-  var hashed = crypto.createHash('sha256').update(total_hash_buf).digest();
+  var hashed = createHash('sha256').update(total_hash_buf).digest();
   return hashed;
 }
 // 'key' is a regular buffer, that we re-encode into a base64 string for fullHmac.
@@ -362,8 +360,7 @@ function kdf(key, label, context, numbits) {
     console.log("kdf: lenBuf", lenBuf);
   }
   var b64Key = key.toString('base64');
-  var zeroByte = new Buffer(1);
-  zeroByte.writeUInt8(0,0);
+  var zeroByte = new Buffer(1).fill(0);
   var completeValue = Buffer.concat([
     oneBuf, new Buffer(label), zeroByte, new Buffer(context), lenBuf]);
   var full_hmac = fullHmac(b64Key, completeValue.toString('base64'));
@@ -407,9 +404,9 @@ function GenMessages() {
           var dhpart2 = loaded_messages.dhpart2.h1 + loaded_messages.pkey + loaded_messages.mac;
           var hello_obj = loaded_messages['hello-' + responder];
           var hello = hello_obj.h3 + hello_obj.hk + hello_obj.mac;
-          var hvi = crypto.createHash('sha256').update(dhpart2 + hello).digest('base64');
+          var hvi = createHash('sha256').update(dhpart2 + hello).digest('base64');
           var h2 = loaded_messages.hashes[argv.roleNum][2];
-          var hk = crypto.createHash('sha256').update(own_public_key.key).digest('base64');
+          var hk = createHash('sha256').update(own_public_key.key).digest('base64');
           var version = '0.1';
           var message = {
             'type': 'Commit',
@@ -445,26 +442,24 @@ function GenMessages() {
             // ecdhBob, as that's not related specifically to our alice or bob.
             // It's the bob role, not our actual bob.
             initiator_user.ecdhBob('P_256', resp_key.key).then(function (result) {
-              var be64Zero = new Buffer(8),
-                  beZero = new Buffer(4),
+              var be64Zero = new Buffer(8).fill(0),
+                  beZero = new Buffer(4).fill(0),
                   beOne = new Buffer(4);
               beOne.writeInt32BE(1,0);
-              beZero.writeInt32BE(0,0);
-              be64Zero.writeInt32BE(0,0);
-              be64Zero.writeInt32BE(0,4);
               // RFC6189-4.4.1.4
               var total_hash = totalHash();
+              var resultBuffer = new Buffer(result);
               var s0_input = Buffer.concat([
-                beOne, new Buffer(result), new Buffer("ZRTP-HMAC-KDF"), be64Zero,
+                beOne, resultBuffer, new Buffer("ZRTP-HMAC-KDF"), be64Zero,
                 be64Zero, total_hash, beZero, beZero, beZero]);
               if (argv.verbose > 0) {
-                console.log("s0_inputs: result:", strBuffer(result));
+                console.log("s0_inputs: result:", strNBuffer(resultBuffer));
                 console.log("s0_inputs: total_hash:", total_hash);
                 console.log("so_inputs: beOne:", beOne);
                 console.log("so_inputs: be64Zero:", be64Zero);
                 console.log("so_inputs: beZero:", beZero);
               }
-              var s0 = crypto.createHash('sha256').update(s0_input).digest();
+              var s0 = createHash('sha256').update(s0_input).digest();
               if (argv.verbose > 0) {
                 console.log("s0: ", s0);
               }

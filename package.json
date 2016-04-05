@@ -9,6 +9,7 @@
   "author": "Molly Ling <mollyling@uproxy.org>",
   "license": "Apache Version 2.0",
   "dependencies": {
+      "bytebuffer": "^5.0.1",
       "e2e": "^0.0.6",
       "es6-promise": "~3.0",
       "freedom": "~0.6.26",
@@ -18,6 +19,7 @@
       "lodash": "^3.0.0",
       "randgen": "~0.1",
       "request": "~2.65",
+      "sha.js": "^2.4.5",
       "sprintf": "~0.1",
       "json-store": "0.0.1",
       "yargs": "~3.31"
