@@ -26,29 +26,24 @@ var argv = require('yargs')
     .demand(1)
     .argv;
 
-//debugger;
 // Message File Format:
-/*
-
-  {
-
-  -- returned from e2e's key generator.  To reliably reconstruct the
-  -- same keys.  NO.  Instead, hard-code two hand-made keys and use
-  -- them.  Otherwise this is all rather crap, fighting keys back and
-  -- forth.
-  keys: { password, keys: [0-key, 1-key ] }
-  hashes: [ {h3, h2, h1, h0}, {h3, h2, h1, h0} ]
-  hello-0: {}
-  hello-1: {}
-  init-role: 0 or 1
-  commit: {}
-  dhpart1: {}
-  dhpart2: {}
-  confirm1: {}
-  confirm2: {}
-  conf2ack: {}
+/*  {
+         -- returned from e2e's key generator.  To reliably reconstruct the
+         -- same keys.  NO.  Instead, hard-code two hand-made keys and use
+         -- them.  Otherwise this is all rather crap, fighting keys back and
+         -- forth.
+         keys: { password, keys: [0-key, 1-key ] }
+         hashes: [ {h3, h2, h1, h0}, {h3, h2, h1, h0} ]
+         hello-0: {}
+         hello-1: {}
+         init-role: 0 or 1
+         commit: {}
+         dhpart1: {}
+         dhpart2: {}
+         confirm1: {}
+         confirm2: {}
+         conf2ack: {}
   }
-
 */
 
 var filename = argv._[0];
@@ -305,6 +300,7 @@ function makeHello(own_public_key, role) {
   message.hk = own_public_key.fingerprint.replace(/ /g, '');
   message.mac = mac(loaded_messages.hashes[role][1],
                     message.h3 + message.hk + message.clientVersion);
+  message.version = 1.0;
   return message;
 }
 
@@ -401,7 +397,8 @@ function GenMessages() {
               console.log('xx Need to generate HELLO messages before COMMIT.');
               process.exit(1);
           }
-          var dhpart2 = loaded_messages.dhpart2.h1 + loaded_messages.pkey + loaded_messages.mac;
+          var dhpart2 = loaded_messages.dhpart2.h1 + loaded_messages.dhpart2.pkey +
+              loaded_messages.dhpart2.mac;
           var hello_obj = loaded_messages['hello-' + responder];
           var hello = hello_obj.h3 + hello_obj.hk + hello_obj.mac;
           var hvi = createHash('sha256').update(dhpart2 + hello).digest('base64');
