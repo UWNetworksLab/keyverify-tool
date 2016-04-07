@@ -6,8 +6,6 @@ var randgen = require('randgen');
 var request = require('request');
 var createHash = require('sha.js');
 var fs = require('fs');
-var unused = require('json-store');
-var testutil = require('freedom/spec/util');
 var argv = require('yargs')
     .usage('Usage: $0 [-v] [-h] [-i] [-r N] [-g msg] [-s] <msgfile>')
     .count('verbose')
@@ -495,9 +493,6 @@ function GenMessages() {
   }
 }
 
-//var pgpapi = JSON.parse(fs.readFileSync('node_modules/freedom-pgp-e2e/dist/pgpapi.json', 'utf8')).api.crypto;
-//var e2e = require('freedom-pgp-e2e/dist/e2e_super').mye2e;
-//var proto = testutil.directProviderFor(e2e, pgpapi);
 
 freedom.freedom('node_modules/freedom-pgp-e2e/dist/pgpapi.json', {
 //  portType: 'Direct', moduleContext: true

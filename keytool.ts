@@ -1,37 +1,36 @@
-
-
+var createHash = require('sha.js');
 
 export interface Delegate {
   public sendMessage(msg:any) => bool;
   public showSAS(sas:string) => bool;
 };
 
-export interface Messages {
+class Messages {
   enum Type { Hello1, Hello2, Commit, DHPart1, DHPart2, Confirm1, Confirm2,
               Conf2Ack };
 
   class HelloMessage {
-    constructor(public type: String, public version: String, public h3: String,
-                public hk: String, public clientVersion: String, public mac: String){}
+    constructor(public type: string, public version: string, public h3: string,
+                public hk: string, public clientVersion: string, public mac: string){}
   };
 
   class CommitMessage {
-    constructor(public type: String, public h2: String, public hk: String,
-                public clientVersion: String, public hvi: String,
-                public mac: String){}
+    constructor(public type: string, public h2: string, public hk: string,
+                public clientVersion: string, public hvi: string,
+                public mac: string){}
   };
 
   class DHPartMessage {
-    constructor(public type: String, public h1: String, public pkey: String,
-                public mac: String) {}
+    constructor(public type: string, public h1: string, public pkey: string,
+                public mac: string) {}
   };
 
   class ConfirmMessage {
-    constructor(public type: String, public h0: String, public mac: String) {}
+    constructor(public type: string, public h0: string, public mac: string) {}
   };
 
   class ConfAckMessage {
-    constructor(public type:String) {}
+    constructor(public type:string) {}
   };
 
   class Tagged {
@@ -46,6 +45,9 @@ export class Verifier {
   // Zero or 1.  role_ 0 sends Hello1.  role_ 1 sends Hello2.  Doesn't
   // determine who's sending 'Commit'.
   private role_:number;
+  private ourPubKey_:string;
+  private peerPubKey_:string;
+  private ourHashes_:string[];
   private result_:Promise<bool>;
   private delegate_:Delegate;
   private static keyMap_ = {
@@ -70,22 +72,33 @@ export class Verifier {
   // Messages are existing messages received or sent in the
   // conversation.  Useful both for testing and for when this Verifier
   // is being created in response to a received message.
-  constructor(delegate:Delegate);
-  constructor(messages: {[Messages.Type]:Messages.Tagged},
+  constructor(ourPubKey: string,
+              peerPubKey: string,
+              delegate:Delegate);
+  constructor(ourPubKey: string,
+              peerPubKey: string,
+              messages: {[Messages.Type]:Messages.Tagged},
+              ourHashes: string[],
               role:number,
               delegate:Delegate) {
-    // Beginning of conversation.
+    this.ourPubKey_ = ourPubKey;
+    this.peerPubKey_ = peerPubKey;
+    this.delegate_ = delegate;
+
     if (messages === undefined) {
+      // Beginning of conversation.
       this.messages_ = {};
       this.role_ = 0;
+      this.ourHashes_ = this.generateHashes();
     } else {
+      // Peer started conversation, or this is a resumption.
       this.messages_ = messages;
       this.role_ = role;
+      this.ourHashes_ = ourHashes;
     }
-    this.delegate_ = delegate;
   }
 
-  private hashString(s:String) :String {
+  private hashString(s:string) :string {
     return createHash('sha256').update(s).digest().toString('base64');
   }
 
