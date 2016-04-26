@@ -1,8 +1,8 @@
 var createHash = require('sha.js');
 
 export interface Delegate {
-  public sendMessage(msg:any) => bool;
-  public showSAS(sas:string) => bool;
+  public sendMessage(msg:any) => Promise<bool>;
+  public showSAS(sas:string) => Promise<bool>;
 };
 
 class Messages {
@@ -167,7 +167,23 @@ export class Verifier {
         this.set(new Tagged(Messages.DHPart1,
                             new DHPartMessage(msg.type, msg.h1, msg.pkey, msg.mac)));
         // TODO(mling): Calculate SAS and verify with user.
-
+        var sas = "CALCULATE ME";
+        // There's an explicit choice here to treat the primary failure
+        // mode - a failed SAS verification, the same as an I/O error.
+        // Attackers may just kill the connection to look like an I/O
+        // error, so we don't want the users to be mislead by the user
+        // interface messaging here.  Instead, let them try again and
+        // be more careful about the numbers.  If the numbers don't
+        // match up, they know that they're under attack.
+        this.delegate_.showSAS(sas).then(function (result) {
+          if (result) {
+            this.sendNextMessage();
+          } else {
+            console.log("Failed SAS verification.");
+            this.resolve(false);
+          }
+        });
+        
       } else if (type == 'DHPart2') {
         // Verify that this is the sam ehk.
         var commit = this.messages_[Messages.Commit].value;
@@ -190,7 +206,15 @@ export class Verifier {
                             new DHPartMessage(msg.type, msg.h1, msg.pkey,
                                               msg.mac)));
         // TODO(mling): Calculate SAS and verify with user.
-
+        var sas = "CALCULATE ME";
+        this.delegate_.showSAS(sas).then(function (result) {
+          if (result) {
+            this.sendNextMessage();
+          } else {
+            console.log("Failed SAS verification.");
+            this.resolve(false);
+          }
+        });
       } else if (type == 'Confirm1') {
         // Validate DHpart1
         var dhpart1 = this.messages_[Messages.DHPart1].value;
@@ -271,7 +295,12 @@ export class Verifier {
     if (!this.message_[msgType]) {
       var msg = this.generate(msgType);
       this.set(msg);
-      this.delegate_.sendMessage(msg);
+      this.delegate_.sendMessage(msg).then(function(succeeded) { 
+        if (!succeeded) {
+          console.log("Failed to send message in ZRTP message.  Resolving as failure.");
+          this.result_.resolve<bool>(false);
+        }
+      });
     }
   }
 
@@ -305,6 +334,10 @@ export class Verifier {
   }
   private set(message: Messages.Tagged) :bool {
   }
+
+  private mac() :string {
+  }
+  
 };
 // A heavily validating history store for messages sent and received
 // in a ZRTP conversation.  ConversationHistory validates received
